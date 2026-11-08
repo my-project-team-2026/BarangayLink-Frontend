@@ -77,3 +77,32 @@ The backend uses PostgreSQL `search_path` from `DB_SCHEMA` (defaults to `baranga
 ## Stack
 
 React 18, TypeScript, Vite, React Router, Lucide icons, custom responsive CSS. The project is organized to allow Capacitor or Electron packaging later; those packaging layers are not included yet.
+
+
+## Desktop support (Electron)
+
+The desktop wrapper reuses the same React + TypeScript + Vite interface and the same backend API. It does not create a separate desktop UI. The renderer runs with context isolation enabled, Node integration disabled, and sandboxing enabled. The preload file intentionally exposes no Node APIs.
+
+### Install desktop tooling
+
+Run this once from the frontend project folder (requires an internet connection):
+
+```bash
+npm install
+```
+
+### Run the desktop app during development
+
+```bash
+npm run desktop:dev
+```
+
+Vite serves the frontend locally and Electron opens it in a desktop window. The backend must still be running separately.
+
+### Build installers
+
+On Windows, run `npm run desktop:win` to create a Windows installer in `release/`. On macOS, run `npm run desktop:mac` on a Mac to create DMG and ZIP packages. Cross-platform packaging is not a substitute for testing on each target operating system; macOS builds should be tested and signed on macOS before distribution.
+
+### Important deployment note
+
+The current API base URL is compiled into the Vite build using `VITE_API_BASE_URL`. For a desktop build that connects to a remote server, set that variable before running the build. Do not put database credentials, JWT secrets, or other backend secrets in the frontend environment. A desktop application is a client and must authenticate through the backend API.

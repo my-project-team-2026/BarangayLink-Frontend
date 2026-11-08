@@ -21,3 +21,6 @@ yarn-debug.log*
 .DS_Store
 Thumbs.db
 .vscode/
+
+# Electron packaging outputs
+release/
