@@ -7,8 +7,9 @@ import {
 } from 'lucide-react'
 import { api, ApiError, clearSession, getSavedUser, saveSession } from './api'
 import type { DashboardSummary, DocumentRequest, Resident, User } from './types'
+import { EmptyState, NoticeBox, PageHeading, ageFromBirthdate, formatDate, initials, type Notice } from './shared'
+import { AnnouncementsPage, HouseholdsPage, ReportsPage } from './modules'
 
-type Notice = { kind: 'success' | 'error' | 'info'; text: string }
 function useAuth() {
   const [user, setUser] = useState<User | null>(() => getSavedUser())
   const logout = () => { clearSession(); setUser(null) }
@@ -33,9 +34,9 @@ function App() {
           <Route path="/" element={<DashboardPage user={auth.user} />} />
           <Route path="/residents" element={<ResidentsPage role={auth.user.role} />} />
           <Route path="/requests" element={<RequestsPage user={auth.user} />} />
-          <Route path="/households" element={<ComingSoon title="Household management" description="Create households, assign residents, and identify the head of family." />} />
-          <Route path="/announcements" element={<ComingSoon title="Announcements" description="Publish community announcements and let residents browse current and past notices." />} />
-          <Route path="/reports" element={<ComingSoon title="Reports & analytics" description="Printable population, household, and document-request reports will be available when the corresponding API endpoints are implemented." />} />
+          <Route path="/households" element={auth.user.role==='Resident'?<Navigate to="/" replace />:<HouseholdsPage />} />
+          <Route path="/announcements" element={<AnnouncementsPage role={auth.user.role} />} />
+          <Route path="/reports" element={auth.user.role==='Resident'?<Navigate to="/" replace />:<ReportsPage />} />
           <Route path="/settings" element={<ComingSoon title="Account settings" description="Account administration endpoints are not currently present in the supplied backend." />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
@@ -49,7 +50,6 @@ function pageTitle(path: string) {
   const map: Record<string,string> = {'/':'Dashboard','/residents':'Residents','/requests':'Document requests','/households':'Households','/announcements':'Announcements','/reports':'Reports','/settings':'Settings'}
   return map[path] || 'Dashboard'
 }
-function initials(name: string) { return name.split(/[\s.@_-]+/).filter(Boolean).slice(0,2).map(s=>s[0].toUpperCase()).join('') || 'BL' }
 function Sidebar({ role, mobileOpen, onClose }: { role: string; mobileOpen: boolean; onClose: () => void }) {
   const admin = role === 'Administrator' || role === 'Barangay Staff'
   return <>
@@ -62,7 +62,7 @@ function Sidebar({ role, mobileOpen, onClose }: { role: string; mobileOpen: bool
         {admin && <NavItem to="/residents" icon={<Users size={18}/>} label="Residents" />}
         {role === 'Resident' && <NavItem to="/requests" icon={<ClipboardList size={18}/>} label="My requests"/>}
         {admin && <NavItem to="/requests" icon={<FileText size={18}/>} label="Document requests"/>}
-        <NavItem to="/households" icon={<Home size={18}/>} label="Households" />
+        {admin && <NavItem to="/households" icon={<Home size={18}/>} label="Households" />}
         <NavItem to="/announcements" icon={<Bell size={18}/>} label="Announcements" />
         {admin && <NavItem to="/reports" icon={<Activity size={18}/>} label="Reports & analytics" />}
       </nav>
@@ -72,13 +72,6 @@ function Sidebar({ role, mobileOpen, onClose }: { role: string; mobileOpen: bool
 }
 function NavItem({to, icon, label}: {to:string; icon:ReactNode; label:string}) {
   return <NavLink to={to} end={to==='/'} className={({isActive})=>`nav-item ${isActive?'active':''}`}><span className="nav-icon">{icon}</span><span>{label}</span>{to==='/requests'&&<span className="nav-arrow"><ArrowUpRight size={14}/></span>}</NavLink>
-}
-function PageHeading({eyebrow, title, subtitle, action}: {eyebrow?:string; title:string; subtitle:string; action?:ReactNode}) {
-  return <div className="page-heading"><div>{eyebrow&&<div className="eyebrow">{eyebrow}</div>}<h1>{title}</h1><p>{subtitle}</p></div>{action&&<div className="heading-action">{action}</div>}</div>
-}
-function NoticeBox({notice, onDismiss}: {notice:Notice|null; onDismiss:()=>void}) {
-  if (!notice) return null
-  return <div className={`notice ${notice.kind}`}><span>{notice.kind==='error'?<AlertCircle size={18}/>:<CheckCircle2 size={18}/>}</span><div>{notice.text}</div><button onClick={onDismiss} aria-label="Dismiss"><X size={16}/></button></div>
 }
 function DashboardPage({user}: {user:User}) {
   const [summary,setSummary] = useState<DashboardSummary|null>(null)
@@ -119,7 +112,7 @@ function DashboardPage({user}: {user:User}) {
       {isStaff&&<NavLink to="/residents" className="quick-link"><div className="quick-icon blue"><Users size={18}/></div><div><b>Resident records</b><span>Search and review profiles</span></div><ArrowUpRight size={16}/></NavLink>}
       <NavLink to="/requests" className="quick-link"><div className="quick-icon purple"><ClipboardList size={18}/></div><div><b>{isStaff?'Process requests':'Request a document'}</b><span>{isStaff?'Review and update request status':'Submit and track documents'}</span></div><ArrowUpRight size={16}/></NavLink>
       <NavLink to="/announcements" className="quick-link"><div className="quick-icon orange"><Bell size={18}/></div><div><b>Announcements</b><span>Community notices and updates</span></div><ArrowUpRight size={16}/></NavLink>
-      <NavLink to="/households" className="quick-link"><div className="quick-icon green"><Home size={18}/></div><div><b>Households</b><span>Household records and members</span></div><ArrowUpRight size={16}/></NavLink>
+      {isStaff&&<NavLink to="/households" className="quick-link"><div className="quick-icon green"><Home size={18}/></div><div><b>Households</b><span>Household records and members</span></div><ArrowUpRight size={16}/></NavLink>}
     </div><div className="tip-box"><div><ShieldCheck size={17}/></div><p><b>Keep records accurate</b><br/>BarangayLink follows “Encode Once, Reuse Everywhere” to reduce repeated data entry.</p></div></section></div>
   </>
 }
@@ -154,7 +147,6 @@ function ResidentsPage({role}: {role:string}) {
     {selected&&<div className="modal-backdrop" onClick={()=>setSelected(null)}><section className="detail-modal" onClick={e=>e.stopPropagation()}><div className="modal-head"><div><div className="eyebrow">RESIDENT PROFILE</div><h2>{selected.first_name} {selected.last_name}</h2></div><button className="icon-button" onClick={()=>setSelected(null)}><X size={18}/></button></div><div className="detail-grid">{[['Full name',[selected.first_name,selected.middle_name,selected.last_name,selected.suffix].filter(Boolean).join(' ')],['Birthdate',formatDate(selected.birthdate)],['Age',String(selected.age??ageFromBirthdate(selected.birthdate))],['Gender',selected.gender||'Not provided'],['Civil status',selected.civil_status||'Not provided'],['Purok / zone',selected.purok_zone],['Address',selected.address_line],['Contact',selected.contact_number||'Not provided']].map(([k,v])=><div className="detail-field" key={k}><span>{k}</span><b>{v}</b></div>)}</div><div className="modal-note"><LockKeyhole size={16}/> Personal data is visible only to authorized staff accounts.</div></section></div>}
   </>
 }
-function ageFromBirthdate(birthdate:string){const d=new Date(birthdate);if(Number.isNaN(d.getTime()))return '—' as unknown as number;const now=new Date();let a=now.getFullYear()-d.getFullYear();if(now.getMonth()<d.getMonth()||(now.getMonth()===d.getMonth()&&now.getDate()<d.getDate()))a--;return a}
 function RequestsPage({user}: {user:User}) {
   const [items,setItems]=useState<DocumentRequest[]>([])
   const [loading,setLoading]=useState(true)
@@ -184,8 +176,6 @@ function StatusPill({status}: {status:string}) {
   const cls=status.toLowerCase().replaceAll(' ','-')
   return <span className={`status-pill status-${cls}`}><i/>{status}</span>
 }
-function formatDate(value?:string){if(!value)return '—';const d=new Date(value);return Number.isNaN(d.getTime())?'—':d.toLocaleDateString(undefined,{year:'numeric',month:'short',day:'numeric'})}
-function EmptyState({title,text}: {title:string;text:string}){return <div className="empty-state"><div className="empty-icon"><FileText size={22}/></div><b>{title}</b><p>{text}</p></div>}
 function ComingSoon({title,description}: {title:string;description:string}) {
   return <><PageHeading eyebrow="MVP MODULE" title={title} subtitle={description}/><section className="panel coming-panel"><div className="coming-icon"><PanelLeftClose size={28}/></div><span className="coming-tag">BACKEND ENDPOINT NEEDED</span><h2>This module is planned, but not connected yet.</h2><p>The supplied backend currently exposes authentication, resident read/search, document requests, and dashboard summary endpoints. This screen is a clear placeholder—not fake data—until the team adds the matching API routes and database operations.</p><div className="coming-list"><span><CheckCircle2 size={16}/> UI navigation is ready</span><span><AlertCircle size={16}/> API routes are not in the supplied backend</span></div></section></>
 }

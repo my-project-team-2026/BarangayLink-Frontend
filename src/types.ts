@@ -18,3 +18,24 @@ export interface DashboardSummary {
   [key: string]: unknown
 }
 export interface ApiResult<T> { success: boolean; data: T; count?: number; message?: string }
+
+export interface Household {
+  id: string; household_number: string; purok_zone: string; street_address: string;
+  head_resident_id?: string | null; head_name?: string | null; member_count?: number | string;
+  created_at?: string; updated_at?: string
+}
+export interface HouseholdMember {
+  member_id: string; resident_id: string; first_name: string; last_name: string;
+  age?: number | null; gender?: string | null; relationship_to_head: string; contact_number?: string | null
+}
+export interface HouseholdDetail extends Household { members: HouseholdMember[] }
+export interface Announcement {
+  id: string; title: string; content: string; category: string; is_pinned: boolean;
+  published_by?: string | null; publisher_name?: string | null; created_at: string; updated_at?: string
+}
+export interface AnnouncementInput { title: string; content: string; category: string; is_pinned: boolean }
+export interface DemographicReport {
+  total_population: number | string; male_count: number | string; female_count: number | string;
+  children_count: number | string; adult_count: number | string; senior_count: number | string;
+  total_households: number | string
+}

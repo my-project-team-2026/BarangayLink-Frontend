@@ -1,4 +1,4 @@
-import type { ApiResult, DashboardSummary, DocumentRequest, Resident, User } from './types'
+import type { Announcement, AnnouncementInput, ApiResult, DashboardSummary, DemographicReport, DocumentRequest, Household, HouseholdDetail, Resident, User } from './types'
 
 const API_BASE = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api/v1').replace(/\/$/, '')
 export const TOKEN_KEY = 'barangaylink_token'
@@ -40,6 +40,16 @@ export const api = {
   resident: (id: string) => request<ApiResult<Resident>>(`/residents/${encodeURIComponent(id)}`),
   requests: () => request<ApiResult<DocumentRequest[]>>('/requests'),
   createRequest: (document_type: string, purpose: string) => request<{ success: boolean; message: string; data: DocumentRequest }>('/requests', { method: 'POST', body: JSON.stringify({ document_type, purpose }) }),
-  updateRequestStatus: (id: string, status: string, remarks: string) => request<{ success: boolean; message: string }>(`/requests/${encodeURIComponent(id)}/status`, { method: 'PATCH', body: JSON.stringify({ status, remarks }) })
+  updateRequestStatus: (id: string, status: string, remarks: string) => request<{ success: boolean; message: string }>(`/requests/${encodeURIComponent(id)}/status`, { method: 'PATCH', body: JSON.stringify({ status, remarks }) }),
+  households: (params: URLSearchParams) => request<ApiResult<Household[]>>(`/households${params.size ? `?${params.toString()}` : ''}`),
+  household: (id: string) => request<ApiResult<HouseholdDetail>>(`/households/${encodeURIComponent(id)}`),
+  createHousehold: (data: { household_number: string; purok_zone: string; street_address: string; head_resident_id?: string | null }) => request<{ success: boolean; message: string; data: { id: string } }>('/households', { method: 'POST', body: JSON.stringify(data) }),
+  assignHouseholdMember: (id: string, resident_id: string, relationship_to_head: string) => request<{ success: boolean; message: string }>(`/households/${encodeURIComponent(id)}/members`, { method: 'POST', body: JSON.stringify({ resident_id, relationship_to_head }) }),
+  removeHouseholdMember: (id: string, residentId: string) => request<{ success: boolean; message: string }>(`/households/${encodeURIComponent(id)}/members/${encodeURIComponent(residentId)}`, { method: 'DELETE' }),
+  announcements: (category?: string) => request<ApiResult<Announcement[]>>(`/announcements${category ? `?category=${encodeURIComponent(category)}` : ''}`),
+  createAnnouncement: (data: AnnouncementInput) => request<{ success: boolean; message: string }>('/announcements', { method: 'POST', body: JSON.stringify(data) }),
+  updateAnnouncement: (id: string, data: AnnouncementInput) => request<{ success: boolean; message: string }>(`/announcements/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify(data) }),
+  deleteAnnouncement: (id: string) => request<{ success: boolean; message: string }>(`/announcements/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  demographicsReport: () => request<ApiResult<DemographicReport>>('/reports/demographics')
 }
 export const apiBase = API_BASE
