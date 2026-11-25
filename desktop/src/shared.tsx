@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { useEffect, useRef, type ReactNode } from 'react'
 import { AlertCircle, CheckCircle2, FileText, X } from 'lucide-react'
 
 export type Notice = { kind: 'success' | 'error' | 'info'; text: string }
@@ -26,6 +26,12 @@ export function PageHeading({ eyebrow, title, subtitle, action }: { eyebrow?: st
   return <div className="page-heading"><div>{eyebrow && <div className="eyebrow">{eyebrow}</div>}<h1>{title}</h1><p>{subtitle}</p></div>{action && <div className="heading-action">{action}</div>}</div>
 }
 export function NoticeBox({ notice, onDismiss }: { notice: Notice | null; onDismiss: () => void }) {
+  useEffect(() => {
+    if (!notice) return
+    const timer = window.setTimeout(onDismiss, notice.kind === 'error' ? 5000 : 3000)
+    return () => window.clearTimeout(timer)
+  }, [notice, onDismiss])
+
   if (!notice) return null
   return <div className={`notice ${notice.kind}`}><span>{notice.kind === 'error' ? <AlertCircle size={18} /> : <CheckCircle2 size={18} />}</span><div>{notice.text}</div><button onClick={onDismiss} aria-label="Dismiss"><X size={16} /></button></div>
 }

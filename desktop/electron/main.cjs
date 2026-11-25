@@ -1,5 +1,6 @@
 const { app, BrowserWindow, shell } = require('electron')
 const path = require('node:path')
+const { pathToFileURL } = require('node:url')
 
 const isDevelopment = !app.isPackaged
 
@@ -21,27 +22,24 @@ function createWindow() {
   })
 
   mainWindow.once('ready-to-show', () => mainWindow.show())
-
-  // Keep external links in the user's default browser, not inside the app window.
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     if (url.startsWith('https://') || url.startsWith('http://')) shell.openExternal(url)
     return { action: 'deny' }
   })
-
+  const packagedIndexUrl = pathToFileURL(path.join(__dirname, '..', 'dist', 'index.html')).href
   mainWindow.webContents.on('will-navigate', (event, url) => {
-    const allowed = isDevelopment
-      ? url.startsWith('http://127.0.0.1:5173')
-      : url.startsWith('file://')
+    const allowed = isDevelopment ? url.startsWith('http://127.0.0.1:5174/') : url === packagedIndexUrl
     if (!allowed) event.preventDefault()
   })
 
   if (isDevelopment) {
-    mainWindow.loadURL('http://127.0.0.1:5173')
+    mainWindow.loadURL('http://127.0.0.1:5174')
     mainWindow.webContents.openDevTools({ mode: 'detach' })
   } else {
     mainWindow.loadFile(path.join(__dirname, '..', 'dist', 'index.html'))
   }
 }
+
 
 app.whenReady().then(() => {
   createWindow()
@@ -49,7 +47,6 @@ app.whenReady().then(() => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
   })
 })
-
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit()
 })

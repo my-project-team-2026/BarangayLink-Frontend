@@ -4,7 +4,7 @@ import {
 } from 'lucide-react'
 import { api } from './api'
 import type { Announcement, DemographicReport, Household, HouseholdDetail, Resident } from './types'
-import { EmptyState, NoticeBox, PageHeading, errText, formatDate, initials, type Notice } from './shared'
+import { EmptyState, NoticeBox, PageHeading, ageFromBirthdate, errText, formatDate, initials, type Notice } from './shared'
 
 /* ------------------------------------------------------------------ */
 /* Resident picker: backend paginates residents, so search by name.    */
@@ -115,17 +115,22 @@ export function HouseholdsPage() {
   </>
 }
 
+function normalizePurok(value: string) { const m = value.trim().match(/^(purok|zone)\s*(\d+)$/i); return m ? `${m[1][0].toUpperCase()}${m[1].slice(1).toLowerCase()} ${m[2]}` : value.trim().replace(/\s+/g, ' ') }
+
 function CreateHouseholdModal({ onClose, onCreated }: { onClose: () => void; onCreated: (id: string) => void }) {
   const [number, setNumber] = useState('')
   const [purok, setPurok] = useState('')
   const [address, setAddress] = useState('')
   const [head, setHead] = useState<Resident | null>(null)
+  const [initialMember, setInitialMember] = useState<Resident | null>(null)
+  const [initialRelationship, setInitialRelationship] = useState('Spouse')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const submit = async (e: FormEvent) => {
     e.preventDefault(); setSaving(true); setError('')
     try {
-      const r = await api.createHousehold({ household_number: number.trim(), purok_zone: purok.trim(), street_address: address.trim(), head_resident_id: head?.id ?? null })
+      const r = await api.createHousehold({ household_number: number.trim(), purok_zone: normalizePurok(purok), street_address: head?.address_line?.trim() || address.trim(), head_resident_id: head?.id ?? null })
+      if (initialMember && initialMember.id !== head?.id) await api.assignHouseholdMember(r.data.id, initialMember.id, initialRelationship)
       onCreated(r.data.id)
     } catch (err) { setError(errText(err, 'Could not create household.')) } finally { setSaving(false) }
   }
@@ -137,9 +142,11 @@ function CreateHouseholdModal({ onClose, onCreated }: { onClose: () => void; onC
         <label>Household number<input required value={number} onChange={e => setNumber(e.target.value)} placeholder="e.g. HH-0001" /></label>
         <label>Purok / zone<input required value={purok} onChange={e => setPurok(e.target.value)} placeholder="e.g. Purok 1" /></label>
       </div>
-      <label>Street address<input required value={address} onChange={e => setAddress(e.target.value)} placeholder="House number, street" /></label>
-      <ResidentPicker label="Head of family" value={head} onChange={setHead} />
-      <p className="form-hint">The head is automatically listed as a member with the relationship “Head”.</p>
+      <label>Street address<input required value={head?.address_line || address} onChange={e => setAddress(e.target.value)} placeholder="House number, street" /></label>
+      <ResidentPicker label="Head of family" value={head} onChange={r => { setHead(r); if (r?.address_line) setAddress(r.address_line) }} />
+      <ResidentPicker label="Add another household member (optional)" value={initialMember} onChange={setInitialMember} />
+      {initialMember && <label className="picker"><span>Relationship to head</span><select value={initialRelationship} onChange={e=>setInitialRelationship(e.target.value)}>{RELATIONSHIPS.map(x=><option key={x}>{x}</option>)}</select></label>}
+      <p className="form-hint">The selected head's address becomes the household address. You can add one initial member before creating the household.</p>
       <div className="form-actions"><button className="button secondary" type="button" onClick={onClose}>Cancel</button><button className="button primary" disabled={saving} type="submit">{saving ? 'Creating…' : 'Create household'}</button></div>
     </form>
   </section></div>
@@ -152,10 +159,13 @@ function HouseholdDetailModal({ id, onClose, onChanged }: { id: string; onClose:
   const [resident, setResident] = useState<Resident | null>(null)
   const [relationship, setRelationship] = useState(RELATIONSHIPS[0])
   const [busy, setBusy] = useState(false)
+  const [editing, setEditing] = useState(false)
+  const [headResident, setHeadResident] = useState<Resident | null>(null)
+  const [householdForm, setHouseholdForm] = useState({household_number:'',purok_zone:'',street_address:''})
 
   const load = useCallback(async () => {
     setLoading(true)
-    try { setData((await api.household(id)).data) }
+    try { const result=(await api.household(id)).data; setData(result); setHouseholdForm({household_number:result.household_number,purok_zone:result.purok_zone,street_address:result.street_address}) }
     catch (e) { setNotice({ kind: 'error', text: errText(e, 'Could not load household.') }) }
     finally { setLoading(false) }
   }, [id])
@@ -169,6 +179,8 @@ function HouseholdDetailModal({ id, onClose, onChanged }: { id: string; onClose:
       setResident(null); setNotice({ kind: 'success', text: 'Member added to household.' }); await load(); onChanged()
     } catch (err) { setNotice({ kind: 'error', text: errText(err, 'Could not add member.') }) } finally { setBusy(false) }
   }
+  const saveHousehold = async (e:FormEvent) => { e.preventDefault(); if(!data)return; setBusy(true); try { await api.updateHousehold(id,{...householdForm,head_resident_id:headResident?.id || data.head_resident_id || null}); setEditing(false); setNotice({kind:'success',text:'Household updated.'}); await load(); onChanged() } catch(err){setNotice({kind:'error',text:errText(err,'Could not update household.')})} finally{setBusy(false)} }
+  const deleteHousehold = async () => { if(!window.confirm('Delete this household and its member assignments? Resident records will not be deleted.'))return; setBusy(true); try{await api.deleteHousehold(id);onChanged();onClose()}catch(err){setNotice({kind:'error',text:errText(err,'Could not delete household.')})}finally{setBusy(false)} }
   const remove = async (m: { resident_id: string; first_name: string; last_name: string }) => {
     if (!window.confirm(`Remove ${m.first_name} ${m.last_name} from this household?`)) return
     setBusy(true); setNotice(null)
@@ -177,9 +189,10 @@ function HouseholdDetailModal({ id, onClose, onChanged }: { id: string; onClose:
   }
 
   return <div className="modal-backdrop" onClick={onClose}><section className="detail-modal wide" onClick={e => e.stopPropagation()}>
-    <div className="modal-head"><div><div className="eyebrow">HOUSEHOLD</div><h2>{data ? data.household_number : 'Loading…'}</h2></div><button className="icon-button" onClick={onClose}><X size={18} /></button></div>
+    <div className="modal-head"><div><div className="eyebrow">HOUSEHOLD</div><h2>{data ? data.household_number : 'Loading…'}</h2></div><div className="panel-tools">{data&&<button className="button secondary" onClick={()=>setEditing(v=>!v)}>{editing?'Cancel':'Edit household'}</button>}<button className="icon-button" onClick={onClose}><X size={18} /></button></div></div>
     {notice && <NoticeBox notice={notice} onDismiss={() => setNotice(null)} />}
     {loading && !data ? <div className="loading-state"><span className="spinner" />Loading household…</div> : data && <>
+      {editing && <form className="request-form" onSubmit={saveHousehold}><div className="form-two"><label>Household number<input required value={householdForm.household_number} onChange={e=>setHouseholdForm(v=>({...v,household_number:e.target.value}))}/></label><label>Purok / zone<input required value={householdForm.purok_zone} onChange={e=>setHouseholdForm(v=>({...v,purok_zone:e.target.value}))}/></label><label>Street address<input required value={householdForm.street_address} onChange={e=>setHouseholdForm(v=>({...v,street_address:e.target.value}))}/></label><ResidentPicker label="Change head of family" value={headResident} onChange={r=>{setHeadResident(r);if(r?.address_line)setHouseholdForm(v=>({...v,street_address:r.address_line!}))}}/></div><div className="form-actions"><button className="button primary" disabled={busy}>Save household</button><button type="button" className="button secondary" disabled={busy} onClick={()=>void deleteHousehold()}>Delete household</button></div></form>}
       <div className="detail-grid">
         <div className="detail-field"><span>Head of family</span><b>{data.head_name || 'Not assigned'}</b></div>
         <div className="detail-field"><span>Purok / zone</span><b>{data.purok_zone}</b></div>
@@ -302,12 +315,14 @@ export function ReportsPage() {
   const [notice, setNotice] = useState<Notice | null>(null)
   const [reload, setReload] = useState(0)
   const [generated, setGenerated] = useState<Date | null>(null)
+  const [ageResidents, setAgeResidents] = useState<Resident[]>([])
+  const [ageGroup, setAgeGroup] = useState<'children'|'adults'|'seniors'>('children')
 
   useEffect(() => {
     let cancelled = false
     ;(async () => {
       setLoading(true)
-      try { const r = await api.demographicsReport(); if (!cancelled) { setReport(r.data); setGenerated(new Date()) } }
+      try { const r = await api.demographicsReport(); const all: Resident[] = []; let page = 1; let pages = 1; do { const p = new URLSearchParams({status:'active',page:String(page),limit:'100'}); const rr = await api.residents(p); all.push(...(rr.data || [])); pages = rr.pagination?.totalPages || 1; page += 1 } while (page <= pages && page <= 100); if (!cancelled) { setReport(r.data); setAgeResidents(all); setGenerated(new Date()) } }
       catch (e) { if (!cancelled) setNotice({ kind: 'error', text: errText(e, 'Could not load the report.') }) }
       finally { if (!cancelled) setLoading(false) }
     })()
@@ -341,6 +356,7 @@ export function ReportsPage() {
           <div className="mini-kpi"><span><Activity size={12} /> Avg. people per household</span><b>{avg}</b></div>
           <div className="mini-kpi"><span><ShieldCheck size={12} /> Senior citizens</span><b>{n(report.senior_count).toLocaleString()}</b></div>
         </div>
+        <section className="panel list-panel age-detail-report"><div className="panel-head"><div><h2>Residents by age group</h2><p>Names and ages from active resident records. Export each group separately.</p></div><div className="panel-tools no-print"><select value={ageGroup} onChange={e=>setAgeGroup(e.target.value as typeof ageGroup)}><option value="children">Children (0–17)</option><option value="adults">Adults (18–59)</option><option value="seniors">Senior citizens (60+)</option></select><button className="button secondary" onClick={()=>{const rows=ageResidents.filter(r=>{const a=Number(r.age ?? ageFromBirthdate(r.birthdate));return ageGroup==='children'?a>=0&&a<=17:ageGroup==='adults'?a>=18&&a<=59:a>=60});const csv=[['Full name','Age','Birthdate','Purok / Zone','Address'],...rows.map(r=>[[r.first_name,r.middle_name,r.last_name,r.suffix].filter(Boolean).join(' '),String(r.age ?? ageFromBirthdate(r.birthdate)),r.birthdate||'',r.purok_zone||'',r.address_line||''])].map(row=>row.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(',')).join('\r\n');const blob=new Blob([csv],{type:'text/csv;charset=utf-8'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=`barangaylink-${ageGroup}-residents.csv`;a.click();URL.revokeObjectURL(url)}}>Download CSV</button><button className="button secondary" onClick={()=>{document.body.classList.add('print-age-only');window.print();window.addEventListener('afterprint',()=>document.body.classList.remove('print-age-only'),{once:true})}}><Printer size={15}/> Print</button></div></div><div className="table-wrap"><table><thead><tr><th>Resident name</th><th>Age</th><th>Birthdate</th><th>Purok / Zone</th></tr></thead><tbody>{ageResidents.filter(r=>{const a=Number(r.age ?? ageFromBirthdate(r.birthdate));return ageGroup==='children'?a>=0&&a<=17:ageGroup==='adults'?a>=18&&a<=59:a>=60}).map(r=><tr key={r.id}><td>{[r.first_name,r.middle_name,r.last_name,r.suffix].filter(Boolean).join(' ')}</td><td>{r.age ?? ageFromBirthdate(r.birthdate)}</td><td>{formatDate(r.birthdate)}</td><td>{r.purok_zone}</td></tr>)}</tbody></table></div><div className="table-foot"><span>{ageResidents.filter(r=>{const a=Number(r.age ?? ageFromBirthdate(r.birthdate));return ageGroup==='children'?a>=0&&a<=17:ageGroup==='adults'?a>=18&&a<=59:a>=60}).length} residents in selected age group</span><span>CSV export is separate from the summary report</span></div></section>
         <div className="report-grid">
           <section className="panel list-panel"><div className="panel-head"><div><h2>Age groups</h2><p>Share of the active population</p></div></div><Bars rows={age} tone="blue" /></section>
           <section className="panel list-panel"><div className="panel-head"><div><h2>Gender</h2><p>Share of the active population</p></div></div><Bars rows={sex} tone="teal" /></section>

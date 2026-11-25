@@ -2,6 +2,13 @@ export type UserRole = 'Administrator' | 'Barangay Staff' | 'Resident'
 export interface User {
   id: string; email: string; role: UserRole; resident_id?: string | null; name?: string
 }
+export interface UserProfile {
+  id: string; email: string; role: UserRole; is_active: boolean; created_at?: string;
+  resident_id?: string | null; first_name?: string | null; middle_name?: string | null;
+  last_name?: string | null; suffix?: string | null; birthdate?: string | null;
+  gender?: string | null; civil_status?: string | null; purok_zone?: string | null;
+  address_line?: string | null; contact_number?: string | null;
+}
 export interface Resident {
   id: string; first_name: string; middle_name?: string | null; last_name: string; suffix?: string | null;
   birthdate: string; age?: number; gender?: string; civil_status?: string; purok_zone: string;
@@ -17,7 +24,7 @@ export interface DashboardSummary {
   residents_count?: number; households_count?: number; pending_requests_count?: number;
   [key: string]: unknown
 }
-export interface ApiResult<T> { success: boolean; data: T; count?: number; message?: string }
+export interface ApiResult<T> { success: boolean; data: T; count?: number; message?: string; pagination?: { total:number; page:number; limit:number; totalPages:number } }
 
 export interface Household {
   id: string; household_number: string; purok_zone: string; street_address: string;
