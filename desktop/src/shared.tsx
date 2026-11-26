@@ -36,3 +36,59 @@ export function NoticeBox({ notice, onDismiss }: { notice: Notice | null; onDism
   return <div className={`notice ${notice.kind}`}><span>{notice.kind === 'error' ? <AlertCircle size={18} /> : <CheckCircle2 size={18} />}</span><div>{notice.text}</div><button onClick={onDismiss} aria-label="Dismiss"><X size={16} /></button></div>
 }
 export const errText = (e: unknown, fallback: string) => (e instanceof Error ? e.message : fallback)
+
+// ---- Shared modal -------------------------------------------------------
+// One implementation for every dialog: Esc closes only the top-most modal, the
+// dialog is announced to screen readers (role="dialog" + aria-modal), focus moves
+// into the dialog and returns to the opener, and form dialogs can opt out of
+// closing on an outside click so typed data is not discarded by accident.
+const modalStack: symbol[] = []
+
+export function Modal({ onClose, className = 'detail-modal', label, dismissOnBackdrop = true, children }: {
+  onClose: () => void
+  className?: string
+  label: string
+  dismissOnBackdrop?: boolean
+  children: ReactNode
+}) {
+  const dialogRef = useRef<HTMLElement>(null)
+  const closeRef = useRef(onClose)
+  const pressedBackdrop = useRef(false)
+  closeRef.current = onClose
+
+  useEffect(() => {
+    const id = Symbol('modal')
+    modalStack.push(id)
+    const opener = document.activeElement as HTMLElement | null
+    const dialog = dialogRef.current
+    if (dialog && !dialog.contains(document.activeElement)) dialog.focus()
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && modalStack[modalStack.length - 1] === id) {
+        e.stopPropagation()
+        closeRef.current()
+      }
+    }
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('keydown', onKey)
+      const i = modalStack.indexOf(id)
+      if (i >= 0) modalStack.splice(i, 1)
+      opener?.focus?.()
+    }
+  }, [])
+
+  return (
+    <div
+      className="modal-backdrop"
+      onMouseDown={e => { pressedBackdrop.current = e.target === e.currentTarget }}
+      onClick={e => {
+        if (dismissOnBackdrop && pressedBackdrop.current && e.target === e.currentTarget) closeRef.current()
+        pressedBackdrop.current = false
+      }}
+    >
+      <section ref={dialogRef} className={className} role="dialog" aria-modal="true" aria-label={label} tabIndex={-1} style={{ outline: 'none' }}>
+        {children}
+      </section>
+    </div>
+  )
+}

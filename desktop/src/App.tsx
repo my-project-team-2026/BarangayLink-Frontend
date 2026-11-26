@@ -8,7 +8,7 @@ import {
 } from 'lucide-react'
 import { api, ApiError, clearSession, getSavedUser, saveSession, pingApiHealth } from './api'
 import type { DashboardSummary, DocumentRequest, Resident, User } from './types'
-import { EmptyState, NoticeBox, PageHeading, ageFromBirthdate, formatDate, initials, type Notice } from './shared'
+import { EmptyState, Modal, NoticeBox, PageHeading, ageFromBirthdate, formatDate, initials, type Notice } from './shared'
 import { AnnouncementsPage, HouseholdsPage, ReportsPage } from './modules'
 import { SettingsPage, getStoredTheme, applyThemeMode, type ThemeMode } from './settings'
 
@@ -126,7 +126,7 @@ function App() {
         <main className="page-content">
           <Routes>
             <Route path="/" element={<DashboardPage user={auth.user} />} />
-            <Route path="/residents" element={<ResidentsPage role={auth.user.role} />} />
+            <Route path="/residents" element={auth.user.role === 'Resident' ? <Navigate to="/" replace /> : <ResidentsPage role={auth.user.role} />} />
             <Route path="/requests" element={<RequestsPage user={auth.user} />} />
             <Route path="/households" element={auth.user.role === 'Resident' ? <Navigate to="/" replace /> : <HouseholdsPage />} />
             <Route path="/announcements" element={<AnnouncementsPage role={auth.user.role} />} />
@@ -526,8 +526,7 @@ function ResidentsPage({ role }: { role: string }) {
       </section>
       {editor && <ResidentEditorModal resident={editor === 'new' ? null : editor} onClose={() => setEditor(null)} onSaved={() => { setEditor(null); setSelected(null); setReload(v => v + 1) }} />}
       {selected && (
-        <div className="modal-backdrop" onClick={() => setSelected(null)}>
-          <section className="detail-modal" onClick={e => e.stopPropagation()}>
+        <Modal onClose={() => setSelected(null)} className="detail-modal" label="Resident profile">
             <div className="modal-head">
               <div>
                 <div className="eyebrow">RESIDENT PROFILE</div>
@@ -553,8 +552,7 @@ function ResidentsPage({ role }: { role: string }) {
               ))}
             </div>
             <div className="modal-note"><LockKeyhole size={16} /> Personal data is visible only to authorized staff accounts.</div>
-          </section>
-        </div>
+          </Modal>
       )}
     </>
   )
@@ -568,7 +566,7 @@ function ResidentEditorModal({ resident, onClose, onSaved }: { resident: Residen
   const today=localToday()
   const change=(key:string,value:string)=>setForm(v=>({...v,[key]:key==='purok_zone'?normalizePurok(value):value}))
   const submit=async(e:FormEvent)=>{e.preventDefault();setError('');if(!form.birthdate||form.birthdate>today){setError('Birthdate cannot be in the future. Please enter a valid birthdate.');return}const payload={...form,first_name:titleCase(form.first_name),middle_name:titleCase(form.middle_name),last_name:titleCase(form.last_name),suffix:form.suffix.trim().toUpperCase(),purok_zone:normalizePurok(form.purok_zone),address_line:titleCase(form.address_line)};setSaving(true);try{if(resident) await api.updateResident(resident.id,payload as Partial<Resident>); else await api.createResident(payload as Partial<Resident>);onSaved()}catch(err){setError(err instanceof Error?err.message:'Could not save resident.')}finally{setSaving(false)}}
-  return <div className="modal-backdrop" onClick={onClose}><section className="detail-modal" onClick={e=>e.stopPropagation()}><div className="modal-head"><div><div className="eyebrow">RESIDENT RECORD</div><h2>{resident?'Edit resident':'Add resident'}</h2></div><button className="icon-button" onClick={onClose}><X size={18}/></button></div>{error&&<p className="form-error">{error}</p>}<form className="request-form" onSubmit={submit}><div className="form-grid"><label>First name<input required value={form.first_name} onChange={e=>change('first_name',e.target.value)}/></label><label>Middle name<input value={form.middle_name} onChange={e=>change('middle_name',e.target.value)}/></label><label>Last name<input required value={form.last_name} onChange={e=>change('last_name',e.target.value)}/></label><label>Suffix<input value={form.suffix} onChange={e=>change('suffix',e.target.value)}/></label><label>Birthdate<input type="date" required max={today} value={form.birthdate} onChange={e=>change('birthdate',e.target.value)}/></label><label>Gender<select value={form.gender} onChange={e=>change('gender',e.target.value)}><option value="">Not specified</option><option>Male</option><option>Female</option><option>Other</option></select></label><label>Civil status<select value={form.civil_status} onChange={e=>change('civil_status',e.target.value)}>{['Single','Married','Widowed','Divorced','Separated'].map(x=><option key={x}>{x}</option>)}</select></label><label>Purok / zone<input required value={form.purok_zone} onChange={e=>change('purok_zone',e.target.value)}/></label><label>Address<input required value={form.address_line} onChange={e=>change('address_line',e.target.value)}/></label><label>Contact number<input value={form.contact_number} onChange={e=>change('contact_number',e.target.value)}/></label></div><div className="form-actions"><button type="button" className="button secondary" onClick={onClose}>Cancel</button><button className="button primary" disabled={saving}>{saving?'Saving…':'Save resident'}</button></div></form></section></div>
+  return <Modal onClose={onClose} className="detail-modal" label="Resident record" dismissOnBackdrop={false}><div className="modal-head"><div><div className="eyebrow">RESIDENT RECORD</div><h2>{resident?'Edit resident':'Add resident'}</h2></div><button className="icon-button" onClick={onClose}><X size={18}/></button></div>{error&&<p className="form-error">{error}</p>}<form className="request-form" onSubmit={submit}><div className="form-grid"><label>First name<input required value={form.first_name} onChange={e=>change('first_name',e.target.value)}/></label><label>Middle name<input value={form.middle_name} onChange={e=>change('middle_name',e.target.value)}/></label><label>Last name<input required value={form.last_name} onChange={e=>change('last_name',e.target.value)}/></label><label>Suffix<input value={form.suffix} onChange={e=>change('suffix',e.target.value)}/></label><label>Birthdate<input type="date" required max={today} value={form.birthdate} onChange={e=>change('birthdate',e.target.value)}/></label><label>Gender<select value={form.gender} onChange={e=>change('gender',e.target.value)}><option value="">Not specified</option><option>Male</option><option>Female</option><option>Other</option></select></label><label>Civil status<select value={form.civil_status} onChange={e=>change('civil_status',e.target.value)}>{['Single','Married','Widowed','Divorced','Separated'].map(x=><option key={x}>{x}</option>)}</select></label><label>Purok / zone<input required value={form.purok_zone} onChange={e=>change('purok_zone',e.target.value)}/></label><label>Address<input required value={form.address_line} onChange={e=>change('address_line',e.target.value)}/></label><label>Contact number<input value={form.contact_number} onChange={e=>change('contact_number',e.target.value)}/></label></div><div className="form-actions"><button type="button" className="button secondary" onClick={onClose}>Cancel</button><button className="button primary" disabled={saving}>{saving?'Saving…':'Save resident'}</button></div></form></Modal>
 }
 
 function RequestsPage({ user }: { user: User }) {
@@ -750,7 +748,7 @@ function RequestsPage({ user }: { user: User }) {
           <span>Keep your tracking number for follow-up.</span>
         </div>
       </section>
-      {pendingUpdate && <div className="modal-backdrop" onClick={()=>setPendingUpdate(null)}><section className="detail-modal" onClick={e=>e.stopPropagation()}><div className="modal-head"><div><div className="eyebrow">REQUEST STATUS</div><h2>Move to {pendingUpdate.status}</h2></div><button className="icon-button" onClick={()=>setPendingUpdate(null)}><X size={18}/></button></div><form className="request-form" onSubmit={e=>{e.preventDefault();void update()}}>{(pendingUpdate.existingRemarks.trim() || pendingUpdate.status==='Rejected') && <label>Remarks {pendingUpdate.status==='Rejected'?'(required reason)':'(edit existing note)'}<textarea rows={3} value={remarks} required={pendingUpdate.status==='Rejected'} onChange={e=>setRemarks(e.target.value)} placeholder={pendingUpdate.status==='Rejected'?'Explain why this request is rejected…':'Update the existing note…'}/></label>}<div className="form-actions"><button type="button" className="button secondary" onClick={()=>setPendingUpdate(null)}>Cancel</button><button className="button primary">Confirm status</button></div></form></section></div>}
+      {pendingUpdate && <Modal onClose={()=>setPendingUpdate(null)} className="detail-modal" label="Update request status" dismissOnBackdrop={false}><div className="modal-head"><div><div className="eyebrow">REQUEST STATUS</div><h2>Move to {pendingUpdate.status}</h2></div><button className="icon-button" onClick={()=>setPendingUpdate(null)}><X size={18}/></button></div><form className="request-form" onSubmit={e=>{e.preventDefault();void update()}}>{(pendingUpdate.existingRemarks.trim() || pendingUpdate.status==='Rejected') && <label>Remarks {pendingUpdate.status==='Rejected'?'(required reason)':'(edit existing note)'}<textarea rows={3} value={remarks} required={pendingUpdate.status==='Rejected'} onChange={e=>setRemarks(e.target.value)} placeholder={pendingUpdate.status==='Rejected'?'Explain why this request is rejected…':'Update the existing note…'}/></label>}<div className="form-actions"><button type="button" className="button secondary" onClick={()=>setPendingUpdate(null)}>Cancel</button><button className="button primary">Confirm status</button></div></form></Modal>}
     </>
   )
 }

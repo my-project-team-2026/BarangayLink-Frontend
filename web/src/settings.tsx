@@ -6,7 +6,7 @@ import {
 } from 'lucide-react'
 import { api, clearSession } from './api'
 import type { User as AuthUser, UserProfile } from './types'
-import { NoticeBox, PageHeading, formatDate, initials, type Notice } from './shared'
+import { NoticeBox, PageHeading, formatDate, initials, type Notice, Modal } from './shared'
 
 export type ThemeMode = 'light' | 'dark' | 'system'
 
@@ -461,8 +461,7 @@ export function SettingsPage({ user, onLogout, currentTheme, onThemeChange }: Se
 
       {/* LOGOUT CONFIRMATION MODAL */}
       {showLogoutModal && (
-        <div className="modal-backdrop" onClick={() => setShowLogoutModal(false)}>
-          <section className="detail-modal" onClick={e => e.stopPropagation()}>
+        <Modal onClose={() => setShowLogoutModal(false)} className="detail-modal" label="Confirm sign out">
             <div className="modal-head">
               <div>
                 <div className="eyebrow">CONFIRM SIGN OUT</div>
@@ -491,8 +490,7 @@ export function SettingsPage({ user, onLogout, currentTheme, onThemeChange }: Se
                 <LogOut size={16} /> Yes, sign out
               </button>
             </div>
-          </section>
-        </div>
+          </Modal>
       )}
     </>
   )

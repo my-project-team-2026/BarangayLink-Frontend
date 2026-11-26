@@ -4,7 +4,7 @@ import {
 } from 'lucide-react'
 import { api } from './api'
 import type { Announcement, DemographicReport, Household, HouseholdDetail, Resident } from './types'
-import { EmptyState, NoticeBox, PageHeading, ageFromBirthdate, errText, formatDate, initials, type Notice } from './shared'
+import { EmptyState, NoticeBox, PageHeading, ageFromBirthdate, errText, formatDate, initials, type Notice, Modal } from './shared'
 
 /* ------------------------------------------------------------------ */
 /* Resident picker: backend paginates residents, so search by name.    */
@@ -134,7 +134,7 @@ function CreateHouseholdModal({ onClose, onCreated }: { onClose: () => void; onC
       onCreated(r.data.id)
     } catch (err) { setError(errText(err, 'Could not create household.')) } finally { setSaving(false) }
   }
-  return <div className="modal-backdrop" onClick={onClose}><section className="detail-modal wide" onClick={e => e.stopPropagation()}>
+  return <Modal onClose={onClose} className="detail-modal wide" label="Create household" dismissOnBackdrop={false}>
     <div className="modal-head"><div><div className="eyebrow">NEW RECORD</div><h2>Create household</h2></div><button className="icon-button" onClick={onClose}><X size={18} /></button></div>
     {error && <div className="notice error"><div>{error}</div></div>}
     <form className="request-form" onSubmit={submit}>
@@ -149,7 +149,7 @@ function CreateHouseholdModal({ onClose, onCreated }: { onClose: () => void; onC
       <p className="form-hint">The selected head's address becomes the household address. You can add one initial member before creating the household.</p>
       <div className="form-actions"><button className="button secondary" type="button" onClick={onClose}>Cancel</button><button className="button primary" disabled={saving} type="submit">{saving ? 'Creating…' : 'Create household'}</button></div>
     </form>
-  </section></div>
+  </Modal>
 }
 
 function HouseholdDetailModal({ id, onClose, onChanged }: { id: string; onClose: () => void; onChanged: () => void }) {
@@ -188,7 +188,7 @@ function HouseholdDetailModal({ id, onClose, onChanged }: { id: string; onClose:
     catch (err) { setNotice({ kind: 'error', text: errText(err, 'Could not remove member.') }) } finally { setBusy(false) }
   }
 
-  return <div className="modal-backdrop" onClick={onClose}><section className="detail-modal wide" onClick={e => e.stopPropagation()}>
+  return <Modal onClose={onClose} className="detail-modal wide" label="Household details">
     <div className="modal-head"><div><div className="eyebrow">HOUSEHOLD</div><h2>{data ? data.household_number : 'Loading…'}</h2></div><div className="panel-tools">{data&&<button className="button secondary" onClick={()=>setEditing(v=>!v)}>{editing?'Cancel':'Edit household'}</button>}<button className="icon-button" onClick={onClose}><X size={18} /></button></div></div>
     {notice && <NoticeBox notice={notice} onDismiss={() => setNotice(null)} />}
     {loading && !data ? <div className="loading-state"><span className="spinner" />Loading household…</div> : data && <>
@@ -218,7 +218,7 @@ function HouseholdDetailModal({ id, onClose, onChanged }: { id: string; onClose:
         <div className="form-actions"><button className="button primary" type="submit" disabled={!resident || busy}><Plus size={15} /> Add to household</button></div>
       </form>
     </>}
-  </section></div>
+  </Modal>
 }
 
 /* ------------------------------------------------------------------ */
@@ -291,7 +291,7 @@ function AnnouncementModal({ existing, onClose, onSaved }: { existing: Announcem
       else { await api.createAnnouncement(body); onSaved('Announcement published.') }
     } catch (err) { setError(errText(err, 'Could not save announcement.')) } finally { setSaving(false) }
   }
-  return <div className="modal-backdrop" onClick={onClose}><section className="detail-modal wide" onClick={e => e.stopPropagation()}>
+  return <Modal onClose={onClose} className="detail-modal wide" label="Announcement" dismissOnBackdrop={false}>
     <div className="modal-head"><div><div className="eyebrow">{existing ? 'EDIT NOTICE' : 'NEW NOTICE'}</div><h2>{existing ? 'Edit announcement' : 'Publish announcement'}</h2></div><button className="icon-button" onClick={onClose}><X size={18} /></button></div>
     {error && <div className="notice error"><div>{error}</div></div>}
     <form className="request-form" onSubmit={submit}>
@@ -303,7 +303,7 @@ function AnnouncementModal({ existing, onClose, onSaved }: { existing: Announcem
       <label>Message<textarea required rows={6} value={content} onChange={e => setContent(e.target.value)} placeholder="Write the full announcement…" /></label>
       <div className="form-actions"><button className="button secondary" type="button" onClick={onClose}>Cancel</button><button className="button primary" disabled={saving} type="submit">{saving ? 'Saving…' : existing ? 'Save changes' : 'Publish'}</button></div>
     </form>
-  </section></div>
+  </Modal>
 }
 
 /* ------------------------------------------------------------------ */

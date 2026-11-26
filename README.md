@@ -1,108 +1,120 @@
 # BarangayLink Frontend
 
-Responsive React + TypeScript + Vite frontend built around the supplied `Butter/barangaylink-backend` and the BarangayLink project proposal.
+Frontend applications for **BarangayLink: Digital Barangay Management System**. One codebase family, three clients that talk to the same backend API:
+
+| Folder | App | Stack |
+| --- | --- | --- |
+| [`web/`](web) | Web application | React 18, TypeScript, Vite 6 |
+| [`desktop/`](desktop) | Windows / macOS desktop application | Electron 45 + the same React UI, packaged with electron-builder |
+| [`mobile/`](mobile) | Android / iOS mobile application | Expo SDK 58, React Native 0.88 |
+
+## Features
+
+Roles: **Administrator**, **Barangay Staff** and **Resident**. What each user sees depends on their role.
+
+- **Dashboard** with live summary of residents, households and document requests
+- **Residents**: search, filter, pagination, add / edit / view records (staff and admin)
+- **Document requests**: submit, track and update status with remarks
+- **Households**: create households, view details, manage members
+- **Announcements**: categories and pinned notices
+- **Reports & analytics**: demographics and request statistics
+- **Users & audit log**: staff account management and change history (administrator only)
+- **Settings**: profile, password, light / dark theme
+- Session handling: an expired or invalid token signs the user out automatically
+
+The mobile app covers login, registration, dashboard, requests, announcements, reports and settings (including a backend server address setting).
 
 ## Requirements
 
-- Node.js 20+ recommended
-- PostgreSQL database and the supplied backend configured and running
-- Backend API at `http://localhost:3000/api/v1` by default
+- Node.js (current LTS) and npm
+- The BarangayLink **backend API** running and reachable (default `http://localhost:3000/api/v1`), with PostgreSQL set up
+- Mobile only: the **Expo Go** app on a phone, or an Android emulator / iOS simulator
 
-## Run the frontend
+## Configuration
 
-1. Extract this folder next to your existing backend folder.
-2. Open a terminal in `BarangayLink-Frontend`.
-3. Install dependencies and start Vite:
+Each app reads the API address from an environment variable. Copy `.env.example` to `.env` in the app folder and edit it. Do not commit `.env`.
 
-   ```bash
-   npm install
-   npm run dev
-   ```
+| App | Variable | Default |
+| --- | --- | --- |
+| `web` | `VITE_API_BASE_URL` | `http://localhost:3000/api/v1` |
+| `desktop` | `VITE_API_BASE_URL` | `http://localhost:3000/api/v1` |
+| `mobile` | `EXPO_PUBLIC_API_BASE_URL` (optional) | detected from the Expo host, otherwise `http://localhost:3000/api/v1` |
 
-4. Open `http://localhost:5173`.
-5. Start the backend separately from `Butter/barangaylink-backend`:
+For a packaged desktop app the address is fixed at build time, so set `VITE_API_BASE_URL` **before** running the build.
+On a phone, `localhost` means the phone itself. Use the computer's LAN IP, for example `http://192.168.1.10:3000/api/v1`, or set it in the app under **Settings -> Backend server**.
 
-   ```bash
-   npm install
-   npm run dev
-   ```
+## Run the apps
 
-6. If your API is not at `http://localhost:3000/api/v1`, copy `.env.example` to `.env` and set `VITE_API_BASE_URL` to the correct API base. Restart Vite after changing `.env`.
+Install dependencies once in each app folder with `npm install`.
 
-## Included screens
-
-- Sign in using `POST /api/v1/auth/login`; stores JWT and user session in browser local storage.
-- Resident self-registration using `POST /api/v1/auth/register`.
-- Dashboard summary using `GET /api/v1/dashboard` for Administrator / Barangay Staff.
-- Resident search and filtering using `GET /api/v1/residents`.
-- Document request list using `GET /api/v1/requests`.
-- Resident request submission using `POST /api/v1/requests`.
-- Staff/Admin status updates using `PATCH /api/v1/requests/:id/status`.
-- Responsive sidebar and clear placeholder screens for modules whose backend endpoints are not in the supplied project.
-
-## Test accounts from the supplied `seedUsers.js`
-
-The backend seed script defines:
-- Administrator: `admin@barangaylink.gov` / `Admin123!`
-- Barangay Staff: `staff@barangaylink.gov` / `Staff123!`
-
-These accounts only exist after the backend team runs `node seedUsers.js` successfully against the configured database. Change these development passwords before any real use. Do not deploy the included backend `.env` credentials or JWT secret.
-
-## Important integration notes
-
-The supplied backend currently registers these routes:
-
-- `POST /api/v1/auth/register`
-- `POST /api/v1/auth/login`
-- `GET /api/v1/residents`
-- `GET /api/v1/residents/:id`
-- `GET /api/v1/requests`
-- `POST /api/v1/requests`
-- `PATCH /api/v1/requests/:id/status`
-- `GET /api/v1/dashboard`
-- `GET /api/health`
-
-The proposal also calls for household management, announcements, user/account administration, resident add/edit/archive, reports, printable document generation, and IndexedDB caching. Those are not exposed by the provided backend routes, so the frontend does not pretend those operations work. The related navigation items show an explicit backend-needed message until those endpoints are implemented.
-
-The backend uses PostgreSQL `search_path` from `DB_SCHEMA` (defaults to `barangay`). Its supplied `.env` currently contains local development credentials and a JWT secret. Keep that file private and rotate the values before any real deployment.
-
-## If login works but the dashboard fails
-
-- Verify PostgreSQL is running and the backend starts without database errors.
-- Open `http://localhost:3000/api/health` and confirm it reports `UP`.
-- Check that database schema/tables/functions and seed users exist.
-- Confirm the frontend's `VITE_API_BASE_URL` matches the backend.
-- If testing from another device, `localhost` refers to that device; use the backend computer's LAN IP and configure CORS/firewall accordingly.
-
-## Stack
-
-React 18, TypeScript, Vite, React Router, Lucide icons, custom responsive CSS. The project is organized to allow Capacitor or Electron packaging later; those packaging layers are not included yet.
-
-
-## Desktop support (Electron)
-
-The desktop wrapper reuses the same React + TypeScript + Vite interface and the same backend API. It does not create a separate desktop UI. The renderer runs with context isolation enabled, Node integration disabled, and sandboxing enabled. The preload file intentionally exposes no Node APIs.
-
-### Install desktop tooling
-
-Run this once from the frontend project folder (requires an internet connection):
+### Web
 
 ```bash
+cd web
 npm install
+npm run dev        # Vite dev server
+npm run build      # type-check and production build into dist/
+npm run preview    # serve the production build
 ```
 
-### Run the desktop app during development
+### Desktop
 
 ```bash
-npm run desktop:dev
+cd desktop
+npm install
+npm run dev        # starts Vite on 127.0.0.1:5174 and opens the Electron window
 ```
 
-Vite serves the frontend locally and Electron opens it in a desktop window. The backend must still be running separately.
+In development the Electron window opens with DevTools and may show a "Content-Security-Policy" warning. That is expected: the strict security policy is applied to production builds only, and the warning does not appear in the packaged app.
 
-### Build installers
+Build a distributable:
 
-On Windows, run `npm run desktop:win` to create a Windows installer in `release/`. On macOS, run `npm run desktop:mac` on a Mac to create DMG and ZIP packages. Cross-platform packaging is not a substitute for testing on each target operating system; macOS builds should be tested and signed on macOS before distribution.
+```bash
+npm run pack       # unpacked app: release/win-unpacked/BarangayLink Desktop.exe
+npm run win        # Windows installer (NSIS): release/BarangayLink Desktop Setup <version>.exe
+npm run mac        # macOS dmg + zip (must be built on a Mac)
+```
 
-### Important deployment note
+Packaged builds use hash routing, so they work when opened from the file system. The Windows build has been verified; the macOS target is configured but has not been tested.
+The installer is not code-signed, so Windows SmartScreen may show an "unknown publisher" warning.
 
-The current API base URL is compiled into the Vite build using `VITE_API_BASE_URL`. For a desktop build that connects to a remote server, set that variable before running the build. Do not put database credentials, JWT secrets, or other backend secrets in the frontend environment. A desktop application is a client and must authenticate through the backend API.
+### Mobile
+
+```bash
+cd mobile
+npm install
+npx expo start     # then scan the QR code with Expo Go
+```
+
+- **Android**: scan the QR code in Expo Go.
+- **iPhone**: install Expo Go from the App Store, then scan the QR code with the normal Camera app. Phone and computer must be on the same Wi-Fi. If Expo says you are signed in to Expo Go but not the CLI, run `npx expo login` with the same account.
+- Other shortcuts: `npm run android`, `npm run ios`, `npm run web`.
+
+## Project structure
+
+```text
+.
+|- web/        React + Vite web app
+|  `- src/     App.tsx, modules.tsx (households, announcements, reports), settings.tsx, shared.tsx, api.ts, types.ts
+|- desktop/    Electron desktop app (same UI as web)
+|  |- electron/   main.cjs, preload.cjs
+|  `- src/        React UI
+`- mobile/     Expo / React Native app
+   |- App.tsx
+   `- src/        api.ts, theme.ts, types.ts, screens/
+```
+
+`web` and `desktop` currently keep separate copies of the UI source, so a change to one usually needs the same change in the other.
+
+## Troubleshooting
+
+- **"Cannot reach the API" / API Offline**: start the backend and check `VITE_API_BASE_URL`. On a phone, use the computer's LAN IP and allow the backend port through the firewall.
+- **"Resource not found: GET /api/v1/admin/users"**: the running backend does not have the admin routes. Update the backend to the current version and restart it.
+- **Desktop window is blank in `npm run dev`**: make sure port 5174 is free; the dev server uses a fixed port.
+- **"Invalid or expired token"**: sign out and sign in again.
+- **Windows build fails on symbolic links**: run the terminal as Administrator or turn on Windows Developer Mode.
+
+## Notes
+
+- Never commit `.env` files, `node_modules`, `dist` or `release`.
+- `npm audit` may report moderate warnings in dev tooling (file watcher and packaging tools). They do not ship in the apps. Avoid `npm audit fix --force`, which can downgrade Expo or Electron.
